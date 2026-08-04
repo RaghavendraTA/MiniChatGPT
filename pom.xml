@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.ragta</groupId>
-	<artifactId>mychatgpt</artifactId>
+	<artifactId>minichatgpt</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name/>
 	<description/>
