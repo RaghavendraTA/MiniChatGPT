@@ -11,9 +11,9 @@ import dev.langchain4j.service.spring.AiService;
 public interface TestAssistant extends ChatMemoryAccess {
 
     static String SYSTEM_MESSAGE = """
-            you are a chat agent.
+            you are a chat agent, answer using provided data.
+            If provided information is irrelevant then use intelligence to answer
             **Do not mention anything about the provided information**
-            **If the provided content doesn't have what user asking then just apologise**
             """;
 
     @SystemMessage(SYSTEM_MESSAGE)

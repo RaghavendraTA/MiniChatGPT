@@ -1,3 +1,3 @@
 package com.ragta.miniChatGPT.dtos;
 
-public record TokenResponse(String content) {}
+public sealed interface TokenResponse permits TokenContent, TokenCompleteResponse { }

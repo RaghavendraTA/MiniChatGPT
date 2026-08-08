@@ -1,10 +1,12 @@
 package com.ragta.miniChatGPT.services;
 
+import com.ragta.miniChatGPT.dtos.TokenCompleteResponse;
+import com.ragta.miniChatGPT.dtos.TokenContent;
 import com.ragta.miniChatGPT.dtos.TokenResponse;
+import com.ragta.miniChatGPT.services.interfaces.DietitianAgent;
 import com.ragta.miniChatGPT.services.interfaces.TestAssistant;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.StreamingChatModel;
-import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,22 +16,12 @@ import reactor.core.publisher.Sinks;
 @Service
 public class ChatService {
 
-    private final TestAssistant assistant;
-    private final StreamingChatModel chatModel;
+    private final DietitianAgent assistant;
 
     @Autowired
-    public ChatService(DocumentService documentService) {
-
-        this.chatModel = OllamaStreamingChatModel.builder()
-                .baseUrl("http://localhost:11434")
-                .temperature(0.0)
-                .logRequests(true)
-                .logResponses(true)
-                .modelName("gemma4:e4b")
-                .build();
-
-        this.assistant = AiServices.builder(TestAssistant.class)
-                .streamingChatModel(chatModel)
+    public ChatService(StreamingChatModel streamingChatModel, DocumentService documentService) {
+        this.assistant = AiServices.builder(DietitianAgent.class)
+                .streamingChatModel(streamingChatModel)
                 .contentRetriever(documentService.getContentRetriever())
                 .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))
                 .build();
@@ -39,8 +31,11 @@ public class ChatService {
         Sinks.Many<TokenResponse> sink = Sinks.many().unicast().onBackpressureBuffer();
 
         assistant.chat(chatId, userQuery)
-                .onPartialResponse(token -> sink.tryEmitNext(new TokenResponse(token)))
-                .onCompleteResponse(response -> sink.tryEmitComplete())
+                .onPartialResponse(token -> sink.tryEmitNext(new TokenContent(token)))
+                .onCompleteResponse(response -> {
+                    sink.tryEmitNext(new TokenCompleteResponse("done"));
+                    sink.tryEmitComplete();
+                })
                 .onError(sink::tryEmitError)
                 .start();
 

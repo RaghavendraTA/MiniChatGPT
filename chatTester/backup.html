@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventSource Tester</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #2d2d30;
+            color: white;
+        }
+        #messages {
+            border: 1px solid #555;
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: white;
+            color: #1e1e1e;
+            margin-top: 10px;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f3f3f3;
+            color: #1e1e1e;
+            border-radius: 4px;
+        }
+        textarea, input[type="text"] {
+            background-color: #3c3c3c;
+            color: white;
+            border: 1px solid #555;
+            padding: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        #content {
+            background-color: #3c3c3c;
+            color: white;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+        }
+
+        .loader {
+            --color-1: silver;
+            --color-2: #ff3d00;
+            --size: 1px;
+
+            width: calc(48 * var(--size));
+            height: calc(48 * var(--size));
+            border: calc(5 * var(--size)) solid var(--color-1);
+            border-bottom-color: var(--color-2);
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+            position: relative;
+            top: 20px;
+            left: 15px;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <h1>EventSource Tester</h1>
+    <textarea id="userPrompt" placeholder="Type your prmpt here" style="width: 800px; height: 100px"></textarea><br/>
+    <input type="text" id="url" placeholder="Enter EventSource URL" value="http://localhost:8080/api/chat">
+    <button id="sendBtn" onclick="send()">send</button>
+    <span class="loader" id="spin" style="visibility: hidden;"></span>
+    
+    <div id="content"></div>
+
+    <script>
+        
+        function send() {
+            const query = document.getElementById("url").value + "?chatId=1&userQuery=" + document.getElementById("userPrompt").value;
+            const eventSource = new EventSource(query);
+            let output = "";
+            document.getElementById("spin").style.visibility = "visible";
+
+            eventSource.onmessage = function (event) {
+                document.getElementById("spin").style.visibility = "hidden";
+                const data = event.data;
+                output += parse(data);
+                document.getElementById('content').innerHTML = marked.parse(output);
+            };
+
+            eventSource.onerror = function () {
+                eventSource.close();
+            };
+        }
+
+        function parse(data) {
+            return JSON.parse(data).content;
+        }
+    </script>
+</body>
+</html>

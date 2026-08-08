@@ -6,53 +6,125 @@
     <title>EventSource Tester</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #343541;
+            color: #ececf1;
+        }
+
+        .chat-shell {
+            max-width: 900px;
             margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
             padding: 20px;
+            box-sizing: border-box;
         }
-        #messages {
-            border: 1px solid #ccc;
-            height: 300px;
+
+        .chat-window {
+            flex: 1;
+            background: #202123;
+            border: 1px solid #444654;
+            border-radius: 16px;
+            padding: 16px;
             overflow-y: auto;
-            padding: 10px;
-            background-color: #f9f9f9;
-            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
         }
+
         .message {
-            padding: 8px;
-            margin: 5px 0;
-            background-color: #e3f2fd;
-            border-radius: 4px;
+            max-width: 78%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            line-height: 1.5;
+            word-break: break-word;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
         }
+
+        .message.user {
+            margin-left: auto;
+            background: #0f6cbd;
+            color: white;
+            border-bottom-right-radius: 6px;
+            text-align: right;
+        }
+
+        .message.ai {
+            margin-right: auto;
+            background: #444654;
+            color: #ececf1;
+            border-bottom-left-radius: 6px;
+            text-align: left;
+        }
+
+        .message p {
+            margin: 0 0 8px 0;
+        }
+
+        .message p:last-child {
+            margin-bottom: 0;
+        }
+
+        .composer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .url-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        textarea, input[type="text"] {
+            background-color: #3c3c3c;
+            color: white;
+            border: 1px solid #565869;
+            padding: 10px 12px;
+            border-radius: 10px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        input[type="text"] {
+            flex: 1;
+        }
+
         button {
-            padding: 10px 20px;
+            padding: 10px 16px;
             cursor: pointer;
-            background-color: #007bff;
+            background-color: #10a37f;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
         }
+
         button:hover {
-            background-color: #0056b3;
+            background-color: #0e8b6c;
         }
 
         .loader {
             --color-1: silver;
             --color-2: #ff3d00;
             --size: 1px;
-
-            width: calc(48 * var(--size));
-            height: calc(48 * var(--size));
-            border: calc(5 * var(--size)) solid var(--color-1);
+            width: calc(32 * var(--size));
+            height: calc(32 * var(--size));
+            border: calc(4 * var(--size)) solid var(--color-1);
             border-bottom-color: var(--color-2);
             border-radius: 50%;
             display: inline-block;
             box-sizing: border-box;
             animation: rotation 1s linear infinite;
-            position: relative;
-            top: 20px;
-            left: 15px;
+            visibility: hidden;
         }
 
         @keyframes rotation {
@@ -63,41 +135,78 @@
                 transform: rotate(360deg);
             }
         }
-
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <h1>EventSource Tester</h1>
-    <textarea id="userPrompt" placeholder="Type your prmpt here" style="width: 800px; height: 100px"></textarea><br/>
-    <input type="text" id="url" placeholder="Enter EventSource URL" value="http://localhost:8080/api/chat">
-    <button id="sendBtn" onclick="send()">send</button>
-    <span class="loader" id="spin" style="visibility: hidden;"></span>
-    
-    <div id="content"></div>
+    <div class="chat-shell">
+        <div class="chat-window" id="chatWindow"></div>
+
+        <div class="composer">
+            <div class="url-row">
+                <input type="text" id="url" placeholder="Enter EventSource URL" value="http://localhost:8080/api/chat">
+                <button id="sendBtn" onclick="send()">Send</button>
+                <span class="loader" id="spin"></span>
+            </div>
+            <textarea id="userPrompt" placeholder="Type your prompt here"></textarea>
+        </div>
+    </div>
 
     <script>
-        
         function send() {
-            const query = document.getElementById("url").value + "?chatId=1&userQuery=" + document.getElementById("userPrompt").value;
+            const prompt = document.getElementById("userPrompt").value.trim();
+            if (!prompt) {
+                return;
+            }
+
+            const chatWindow = document.getElementById("chatWindow");
+            const userMessage = document.createElement("div");
+            userMessage.className = "message user";
+            userMessage.innerHTML = marked.parse(prompt);
+            chatWindow.appendChild(userMessage);
+
+            const aiMessage = document.createElement("div");
+            aiMessage.className = "message ai";
+            const aiContent = document.createElement("div");
+            aiContent.className = "content";
+            aiMessage.appendChild(aiContent);
+            chatWindow.appendChild(aiMessage);
+
+            document.getElementById("spin").style.visibility = "visible";
+            document.getElementById("userPrompt").value = "";
+
+            const url = document.getElementById("url").value;
+            const query = url + "?chatId=1&userQuery=" + encodeURIComponent(prompt);
             const eventSource = new EventSource(query);
             let output = "";
-            document.getElementById("spin").style.visibility = "visible";
 
             eventSource.onmessage = function (event) {
-                document.getElementById("spin").style.visibility = "hidden";
-                const data = event.data;
-                output += parse(data);
-                document.getElementById('content').innerHTML = marked.parse(output);
+                const data = parse(event.data);
+                if (data.done != undefined) {
+                    document.getElementById("spin").style.visibility = "hidden";
+                    eventSource.close();
+                    return;
+                }
+                if (data) {
+                    const content = data.content || "";
+                    output += content;
+                    aiContent.innerHTML = marked.parse(output);
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                }
             };
 
             eventSource.onerror = function () {
+                document.getElementById("spin").style.visibility = "hidden";
                 eventSource.close();
             };
         }
 
         function parse(data) {
-            return JSON.parse(data).content;
+            try {
+                return JSON.parse(data);
+            } catch (error) {
+                return data;
+            }
         }
     </script>
 </body>

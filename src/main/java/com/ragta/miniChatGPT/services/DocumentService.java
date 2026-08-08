@@ -1,6 +1,7 @@
 package com.ragta.miniChatGPT.services;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import com.ragta.miniChatGPT.llmconfig.LLMProviderFactory;
 import com.ragta.miniChatGPT.parser.PDFParser;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -27,7 +28,7 @@ public class DocumentService {
     private final ElasticsearchContentRetriever contentRetriever;
 
     @Autowired
-    public DocumentService() {
+    public DocumentService(LLMProviderFactory factory) {
 
         this.client = ElasticsearchClient.of(ec -> ec
                 .host("http://localhost:9200")
@@ -39,11 +40,7 @@ public class DocumentService {
                 .indexName("pdf_chunks")
                 .build();
 
-        // Initialize LangChain4j Embedding Model
-        this.embeddingModel = OllamaEmbeddingModel.builder()
-                .baseUrl("http://localhost:11434")
-                .modelName("qwen3-embedding:0.6b")
-                .build();
+        this.embeddingModel = factory.get("ollama").provideEmbeddingModel();
 
         this.contentRetriever = ElasticsearchContentRetriever.builder()
                 .client(client)
