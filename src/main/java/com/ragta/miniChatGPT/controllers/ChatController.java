@@ -1,6 +1,5 @@
 package com.ragta.miniChatGPT.controllers;
 
-import com.ragta.miniChatGPT.dtos.TokenContent;
 import com.ragta.miniChatGPT.dtos.TokenResponse;
 import com.ragta.miniChatGPT.services.ChatService;
 import org.springframework.beans.factory.annotation.Autowired;

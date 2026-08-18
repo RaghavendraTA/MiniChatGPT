@@ -16,11 +16,11 @@ import reactor.core.publisher.Sinks;
 @Service
 public class ChatService {
 
-    private final DietitianAgent assistant;
+    private final TestAssistant assistant;
 
     @Autowired
     public ChatService(StreamingChatModel streamingChatModel, DocumentService documentService) {
-        this.assistant = AiServices.builder(DietitianAgent.class)
+        this.assistant = AiServices.builder(TestAssistant.class)
                 .streamingChatModel(streamingChatModel)
                 .contentRetriever(documentService.getContentRetriever())
                 .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))
