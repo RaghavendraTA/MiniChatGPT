@@ -1,3 +1,3 @@
 package com.ragta.miniChatGPT.dtos;
 
-public record TokenContent(String content) implements TokenResponse {}
+public record TokenContent(Object content) implements TokenResponse {}
