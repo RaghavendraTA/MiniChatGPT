@@ -3,10 +3,15 @@ package com.ragta.miniChatGPT.services;
 import com.ragta.miniChatGPT.dtos.TokenCompleteResponse;
 import com.ragta.miniChatGPT.dtos.TokenContent;
 import com.ragta.miniChatGPT.dtos.TokenResponse;
+import com.ragta.miniChatGPT.llmconfig.MemoryProvider;
 import com.ragta.miniChatGPT.services.interfaces.DietitianAgent;
+import com.ragta.miniChatGPT.services.interfaces.Orchestrator;
 import com.ragta.miniChatGPT.services.interfaces.TestAssistant;
 import com.ragta.miniChatGPT.llmconfig.LLMProviderFactory;
 import com.ragta.miniChatGPT.llmconfig.IModelProvider;
+import com.ragta.miniChatGPT.tools.DietManagerTools;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.agent.tool.ToolSpecifications;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.service.AiServices;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,34 +20,39 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
 
-        private final LLMProviderFactory providerFactory;
-        private final DocumentService documentService;
-        private final List<String> providerOrder;
-        private final int maxRetries;
-        private final long backoffBaseMs;
-        private final ThreadPoolExecutor executor;
+    private final LLMProviderFactory providerFactory;
+    private final DocumentService documentService;
+    private final MemoryProvider memoryProvider;
+    private final List<String> providerOrder;
+    private final int maxRetries;
+    private final long backoffBaseMs;
+    private final ThreadPoolExecutor executor;
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> activeModelList;
 
-        @Autowired
-        public ChatService(LLMProviderFactory providerFactory,
-                   DocumentService documentService,
-                   @Value("${llm.providers:ollama}") String providersCsv,
-                   @Value("${llm.maxRetries:2}") int maxRetries,
-                   @Value("${llm.backoffMs:500}") long backoffBaseMs,
-                   @Value("${llm.maxConcurrency:20}") int maxConcurrency,
-                   @Value("${llm.queueSize:200}") int queueSize) {
+    List<ToolSpecification> toolSpecifications = ToolSpecifications.toolSpecificationsFrom(DietManagerTools.class);
+
+    @Autowired
+    public ChatService(LLMProviderFactory providerFactory,
+               DocumentService documentService,
+               MemoryProvider memoryProvider,
+               @Value("${llm.providers:ollama}") String providersCsv,
+               @Value("${llm.maxRetries:2}") int maxRetries,
+               @Value("${llm.backoffMs:500}") long backoffBaseMs,
+               @Value("${llm.maxConcurrency:2}") int maxConcurrency,
+               @Value("${llm.queueSize:200}") int queueSize) {
 
         this.providerFactory = providerFactory;
         this.documentService = documentService;
+        this.memoryProvider = memoryProvider;
         this.providerOrder = Arrays.stream(providersCsv.split(","))
             .map(String::trim)
             .filter(s -> !s.isEmpty())
@@ -51,6 +61,7 @@ public class ChatService {
 
         this.maxRetries = Math.max(0, maxRetries);
         this.backoffBaseMs = Math.max(50, backoffBaseMs);
+        this.activeModelList = new ConcurrentHashMap<>();
 
         // Bounded executor to limit concurrent streaming connections and protect resources
         this.executor = new ThreadPoolExecutor(
@@ -59,7 +70,7 @@ public class ChatService {
             60L, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(queueSize),
             new ThreadPoolExecutor.CallerRunsPolicy());
-        }
+    }
 
     public Flux<TokenResponse> chat(int chatId, String userQuery) {
         Sinks.Many<TokenResponse> sink = Sinks.many().unicast().onBackpressureBuffer();
@@ -74,23 +85,39 @@ public class ChatService {
                 IModelProvider modelProvider = providerFactory.get(providerName);
                 if (modelProvider == null) continue;
 
+                CompletableFuture<Void> requestFuture = activeModelList.get(providerName);
+                if (requestFuture != null && !requestFuture.isDone()) {
+                    continue;
+                }
+
+                requestFuture = new CompletableFuture<>();
+                activeModelList.put(providerName, requestFuture);
+
                 for (int attempt = 0; attempt <= maxRetries; attempt++) {
                     try {
-                        TestAssistant assistant = AiServices.builder(TestAssistant.class)
+                        // TODO: Need a centralized memory provider as it creates a new instance everytime.
+                        Orchestrator assistant = AiServices.builder(Orchestrator.class)
                                 .streamingChatModel(modelProvider.provideStreamingChatModel())
                                 .contentRetriever(documentService.getContentRetriever())
-                                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))
+                                .chatMemoryProvider(memoryProvider::getMemoryProvider)
+                                .tools(new DietManagerTools())
                                 .build();
 
+                        CompletableFuture<Void> finalRequestFuture = requestFuture;
                         assistant.chat(chatId, userQuery)
                                 .onPartialResponse(token -> sink.tryEmitNext(new TokenContent(token)))
                                 .onCompleteResponse(response -> {
+                                    sink.tryEmitNext(new TokenContent("\n\n---" + providerName));
                                     sink.tryEmitNext(new TokenCompleteResponse("done"));
                                     sink.tryEmitComplete();
+                                    finalRequestFuture.complete(null);
+                                    activeModelList.remove(providerName);
                                 })
                                 .onError(err -> {
                                     // Surface errors back to sink; they will trigger failover handling below
-                                    sink.tryEmitError(err);
+                                    finalRequestFuture.completeExceptionally(err);
+                                    activeModelList.remove(providerName);
+                                    // sink.tryEmitError(err);
                                 })
                                 .start();
 
