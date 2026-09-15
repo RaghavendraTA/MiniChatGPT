@@ -44,7 +44,7 @@ public class ChatService {
     public ChatService(LLMProviderFactory providerFactory,
                DocumentService documentService,
                MemoryProvider memoryProvider,
-               @Value("${llm.providers:ollama}") String providersCsv,
+               @Value("${llm.chat.providers:ollama}") String providersCsv,
                @Value("${llm.maxRetries:2}") int maxRetries,
                @Value("${llm.backoffMs:500}") long backoffBaseMs,
                @Value("${llm.maxConcurrency:2}") int maxConcurrency,

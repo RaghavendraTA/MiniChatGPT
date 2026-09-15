@@ -14,7 +14,7 @@ The app currently supports:
 
 - Uploading PDF documents through a REST endpoint
 - Splitting uploaded PDFs into text chunks
-- Generating embeddings locally with Ollama
+- Generating embeddings using a configurable embedding provider (default: Ollama)
 - Storing embeddings in Elasticsearch
 - Retrieving relevant document chunks during chat
 - Streaming chat responses from Ollama
@@ -98,6 +98,18 @@ spring.ai.ollama.chat.model=gemma4:e4b
 ```
 
 If you decide to use the Ollama models above, update the model names in the code or configuration to match your local pull.
+
+Embedding provider selection
+
+The application now supports selecting the embedding provider via the `llm.embedding.providers` property. It accepts a comma-separated list and the application will try providers in order, picking the first available one. Example values:
+
+```properties
+llm.embedding.providers=ollama
+# or prefer OpenAI then fallback to Ollama
+llm.embedding.providers=open-ai,ollama
+```
+
+Bean lookup supports both the literal provider key (e.g. `open-ai`) and `-embedding` suffixed bean names (e.g. `open-ai-embedding`) to avoid naming conflicts with chat provider beans.
 
 ### 4. Build and run the app
 

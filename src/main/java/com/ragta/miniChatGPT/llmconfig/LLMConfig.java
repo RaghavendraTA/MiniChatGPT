@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class LLMConfig {
 
     @Bean
-    public StreamingChatModel streamingChatModel(LLMProviderFactory factory, @Value("${llm.providers}") String providersCsv) {
+    public StreamingChatModel streamingChatModel(LLMProviderFactory factory, @Value("${llm.chat.providers}") String providersCsv) {
         String defaultProvider = providersCsv.split(",")[0].trim().toLowerCase();
         return factory.get(defaultProvider).provideStreamingChatModel();
     }

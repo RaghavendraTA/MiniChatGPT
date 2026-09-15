@@ -1,44 +1,42 @@
-package com.ragta.miniChatGPT.llmconfig;
+package com.ragta.miniChatGPT.llmconfig.openai;
 
 import com.ragta.miniChatGPT.configurations.OllamaConfig;
+import com.ragta.miniChatGPT.configurations.OpenAIConfig;
+import com.ragta.miniChatGPT.llmconfig.IModelProvider;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.ollama.OllamaChatModel;
-import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
-import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import dev.langchain4j.model.openai.*;
 
-@Component("ollama")
-public class OllamaModelProvider implements IModelProvider {
+@Component("open-ai")
+public class OpenAIModelProvider implements IModelProvider {
 
     private final StreamingChatModel streamingChatModel;
     private final ChatModel chatModel;
     private final EmbeddingModel embeddingModel;
 
-    // TODO: Configure timeouts, retries, and backoff.
-
     @Autowired
-    public OllamaModelProvider(OllamaConfig ollamaConfig) {
+    public OpenAIModelProvider(OpenAIConfig openAIConfig, OllamaConfig ollamaConfig) {
 
-        this.streamingChatModel = OllamaStreamingChatModel.builder()
-                .baseUrl(ollamaConfig.getEndpoint())
+        this.streamingChatModel = OpenAiStreamingChatModel.builder()
+                .baseUrl(openAIConfig.getEndpoint())
                 .temperature(0.0)
                 .logRequests(true)
                 .logResponses(true)
-                .modelName(ollamaConfig.getChatModel())
+                .modelName(openAIConfig.getChatModel())
                 .build();
 
-        this.chatModel = OllamaChatModel.builder()
-                .baseUrl(ollamaConfig.getEndpoint())
+        this.chatModel = OpenAiChatModel.builder()
+                .baseUrl(openAIConfig.getEndpoint())
                 .temperature(0.0)
                 .logRequests(true)
                 .logResponses(true)
-                .modelName(ollamaConfig.getChatModel())
+                .modelName(openAIConfig.getChatModel())
                 .build();
 
-        this.embeddingModel = OllamaEmbeddingModel.builder()
+        this.embeddingModel = OpenAiEmbeddingModel.builder()
                 .baseUrl(ollamaConfig.getEndpoint())
                 .modelName(ollamaConfig.getEmbeddingModel())
                 .build();

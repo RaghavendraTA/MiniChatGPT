@@ -1,7 +1,7 @@
 package com.ragta.miniChatGPT.services;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import com.ragta.miniChatGPT.llmconfig.LLMProviderFactory;
+import com.ragta.miniChatGPT.llmconfig.EmbeddingProviderFactory;
 import com.ragta.miniChatGPT.parser.PDFParser;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -11,6 +11,7 @@ import dev.langchain4j.store.embedding.elasticsearch.ElasticsearchConfigurationK
 import dev.langchain4j.store.embedding.elasticsearch.ElasticsearchEmbeddingStore;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,7 +28,7 @@ public class DocumentService {
     private final ElasticsearchContentRetriever contentRetriever;
 
     @Autowired
-    public DocumentService(LLMProviderFactory factory) {
+    public DocumentService(EmbeddingProviderFactory factory, @Value("${llm.embedding.providers:ollama}") String llmEmbeddingProviders) {
 
         this.client = ElasticsearchClient.of(ec -> ec
                 .host("http://localhost:9200")
@@ -39,7 +40,20 @@ public class DocumentService {
                 .indexName("pdf_chunks")
                 .build();
 
-        this.embeddingModel = factory.get("ollama").provideEmbeddingModel();
+        // `llm.embedding.providers` can be a comma-separated list; pick the first available provider
+        String providerKey = "ollama";
+        try {
+            if (llmEmbeddingProviders != null && !llmEmbeddingProviders.isBlank()) {
+                providerKey = llmEmbeddingProviders.split(",")[0].trim().toLowerCase();
+            }
+        } catch (Exception ignored) {
+        }
+
+        var provider = factory.get(providerKey);
+        if (provider == null) {
+            provider = factory.get("ollama");
+        }
+        this.embeddingModel = provider.provideEmbeddingModel();
 
         this.contentRetriever = ElasticsearchContentRetriever.builder()
                 .client(client)
